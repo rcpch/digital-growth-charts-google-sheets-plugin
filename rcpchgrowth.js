@@ -60,17 +60,6 @@ function UK_WHO_SDS_CENTILE(
     throw data_to_return + " can only be \"both\", \"centiles\", or \"sds\"";
   }
 
-
-  // birth_date="2020-1-12";
-  // observation_date="2022-1-12";
-  // sex="male";
-  // gestation_weeks=32
-  // gestation_days=1
-  // measurement_method="height";
-  // observation_value=92;
-  // primary_api_key='t3st1ngt3st1ngaaaaaaaa'
-  // data_to_return='both'
-
   var formData = {
     birth_date: birth_date,
     observation_date: observation_date,
@@ -81,11 +70,9 @@ function UK_WHO_SDS_CENTILE(
     observation_value: observation_value,
   };
 
-  // return [[birth_date, observation_date, sex, gestation_weeks, gestation_days, measurement_method, observation_value]]
-
   var jsonified = JSON.stringify(formData);
 
-  var url = "https://api.rcpch.ac.uk/growth/v1/uk-who/calculation";
+  var url = "https://api.rcpch.ac.uk/growth/v1/uk-who/calculation"
 
   var request = {
     url: url,
@@ -109,8 +96,6 @@ function UK_WHO_SDS_CENTILE(
 
   var results = JSON.parse(response);
 
-  // var chronological_age = results.measurement_dates.chronological_decimal_age
-  // var corrected_age = results.measurement_dates.corrected_decimal_age
   if (results.measurement_calculated_values === undefined) {
     throw "Null returned from API";
   }
@@ -135,8 +120,6 @@ function UK_WHO_SDS_CENTILE(
   if (data_to_return === 'centiles') {
     return [return_data_payload.slice(2,4)]
   }
-
-
 }
 
 /**
