@@ -1,7 +1,54 @@
 import 'google-apps-script';
 
+// Validation function for input parameters - throws errors, does not return anything.
+function test_helper_(
+  birth_date,
+  observation_date,
+  gestation_weeks,
+  gestation_days,
+  sex,
+  measurement_method,
+  observation_value,
+  data_to_return = 'both',
+  data_to_return_options,
+  primary_api_key,
+) {
+
+  if (birth_date === null) {
+    throw birth_date + " is null";
+  }
+
+  if (observation_date === null) {
+    throw observation_date + " is null";
+  }
+
+  if (isNaN(gestation_weeks) || isNaN(gestation_days)) {
+    throw "The gestations are not numbers";
+  }
+
+  if (["male", "female"].indexOf(sex) === -1) {
+    throw sex + " is not a correct sex. Must be one of \"male\" or \"female\"";
+  }
+
+  if (["height", "weight", "ofc", "bmi"].indexOf(measurement_method) === -1) {
+    throw measurement_method + " is not a correct measurement method";
+  }
+
+  if (isNaN(observation_value)) {
+    throw observation_value + " is not a number.";
+  }
+
+  if (primary_api_key == null) {
+    throw primary_api_key + ' is null';
+  }
+
+  if (data_to_return_options.indexOf(data_to_return) === -1) {
+    throw data_to_return + " can only be \"both\", \"centiles\", or \"sds\"";
+  }
+};
+
 /**
- * Returns an SDS for a given measurement, 2 dates and a sex, using the UK-WHO reference.
+ * Returns an SDS and/or centile for a given measurement, 2 dates and a sex, using the UK-WHO reference.
  * @param {date} birth_date Must be date format
  * @param {date} observation_date Must be date format
  * @param {integer} gestation_weeks Must be integer
@@ -22,43 +69,27 @@ function UK_WHO_SDS_CENTILE(
   sex,
   measurement_method,
   observation_value,
+  data_to_return = 'both',
   primary_api_key,
-  data_to_return='both',
 ) {
-  // convert DateTime object to string
+
+  // validate inputs
+  test_helper_(
+    birth_date,
+    observation_date,
+    gestation_weeks,
+    gestation_days,
+    sex,
+    measurement_method,
+    observation_value,
+    data_to_return,
+    data_to_return_options = ['both', 'sds', 'centile'],
+    primary_api_key,
+  )
+
+  // convert DateTime objects to strings
   birth_date = birth_date.toISOString().split('T')[0]
   observation_date = observation_date.toISOString().split('T')[0]
-  if (birth_date === null || birth_date === undefined) {
-    throw birth_date + " is null";
-  }
-
-  if (observation_date === null || observation_date === undefined) {
-    throw observation_date + " is null";
-  }
-
-  if (isNaN(gestation_weeks) || isNaN(gestation_days)) {
-    throw "The gestations are not numbers";
-  }
-
-  if (["male","female"].indexOf(sex) === -1) {
-    throw sex + " is not a correct sex";
-  }
-
-  if (["height", "weight", "ofc", "bmi"].indexOf(measurement_method) === -1) {
-    throw measurement_method + " is not a correct measurement method";
-  }
-
-  if (isNaN(observation_value)) {
-    throw observation_value + " is not a number.";
-  }
-
-  if (primary_api_key == null) {
-    throw primary_api_key + ' is null';
-  }
-
-  if (["both", "centiles", "sds"].indexOf(data_to_return) === -1) {
-    throw data_to_return + " can only be \"both\", \"centiles\", or \"sds\"";
-  }
 
   var formData = {
     birth_date: birth_date,
@@ -72,7 +103,7 @@ function UK_WHO_SDS_CENTILE(
 
   var jsonified = JSON.stringify(formData);
 
-  var url = "https://api.rcpch.ac.uk/growth/v1/uk-who/calculation"
+  // var url = "https://api.rcpch.ac.uk/growth/v1/uk-who/calculation"
 
   var request = {
     url: url,
@@ -104,130 +135,110 @@ function UK_WHO_SDS_CENTILE(
   var chronological_centile = results.measurement_calculated_values.chronological_centile;
   var corrected_centile = results.measurement_calculated_values.corrected_centile;
 
-  return_data_payload = [
-      corrected_sds,
-      chronological_sds,
-      corrected_centile,
-      chronological_centile,
-    ]
+  let return_data;
 
-  if (data_to_return === 'both') {
-    return [return_data_payload]
+  switch (data_to_return) {
+    case 'both':
+      return_data = [[corrected_sds,chronological_sds,corrected_centile,chronological_centile]];
+      break;
+    case 'sds':
+      return_data = [[corrected_sds,chronological_sds]];
+      break;
+    case 'centiles':
+      return_data = [[corrected_centile,chronological_centile]];
+      break;
   }
-  if (data_to_return === 'sds') {
-    return [return_data_payload.slice(0,3)]
-  }
-  if (data_to_return === 'centiles') {
-    return [return_data_payload.slice(2,4)]
-  }
+
+  return return_data;
 }
 
-/**
- * Returns the chronological age as a decimal from 2 dates.
- * @param {date} birth_date. (must be YYY-MM-DD)
- * @param {date} observation_date. (must be YYY-MM-DD)
- * @param {integer} gestation weeks.
- * @param {integer} gestation days.
- * @param {string} sex: must be one of male or female
- * @param {string} measurement_method: must be one of height, weight, ofc or bmi
- * @param {number} observation_value:
- * @return The chronological age.
- * @customfunction
- */
+  /**
+   * Returns the chronological age as a decimal from 2 dates, and/or decimal age corrected for gestational age if premature (< 37 weeks gestation).
+   * @param {date} birth_date Must be date format
+   * @param {date} observation_date Must be date format
+   * @param {integer} gestation_weeks Must be integer
+   * @param {integer} gestation_days Must be integer
+   * @param {string} sex Must be one of male, female
+   * @param {string} measurement_method Must be one of height, weight, ofc, bmi
+   * @param {number} observation_value
+   * @param {string} primary_api_key Your primary_api_key
+   * @param {string} data_to_return OPTIONAL, default "both", must be one of "both", "chron", "corr"
+   * @return The requested decimal ages. If "both", returns in the following order: chronological age -> corrected age.
+   * @customfunction
+   */
+  function UK_WHO_DECIMAL_AGE(
+    birth_date,
+    observation_date,
+    gestation_weeks,
+    gestation_days,
+    sex,
+    measurement_method,
+    observation_value,
+    data_to_return = 'both',
+    primary_api_key
+  ) {
 
-function chronological_age(
-  birth_date,
-  observation_date,
-  gestation_weeks,
-  gestation_days,
-  sex,
-  measurement_method,
-  observation_value
-) {
-  var formData = {
-    birth_date: birth_date,
-    observation_date: observation_date,
-    sex: sex,
-    gestation_weeks: gestation_weeks,
-    gestation_days: gestation_days,
-    measurement_method: measurement_method,
-    observation_value: observation_value,
-  };
-  var jsonified = JSON.stringify(formData);
+    // validate inputs
+    test_helper_(
+      birth_date,
+      observation_date,
+      gestation_weeks,
+      gestation_days,
+      sex,
+      measurement_method,
+      observation_value,
+      data_to_return,
+      data_to_return_options = ['both', 'chron', 'corr'],
+      primary_api_key,
+    )
 
-  var request = {
-    url: url,
-    payload: jsonified,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  };
+    // convert DateTime objects to strings
+    birth_date = birth_date.toISOString().split('T')[0]
+    observation_date = observation_date.toISOString().split('T')[0]
 
-  var url = "https://api.rcpch.ac.uk/uk-who/calculation";
+    var formData = {
+      birth_date: birth_date,
+      observation_date: observation_date,
+      sex: sex,
+      gestation_weeks: gestation_weeks,
+      gestation_days: gestation_days,
+      measurement_method: measurement_method,
+      observation_value: observation_value,
+    };
+    var jsonified = JSON.stringify(formData);
 
-  var response = UrlFetchApp.fetch(url, request);
+    var request = {
+      url: url,
+      payload: jsonified,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        'Subscription-Key' : primary_api_key
+      },
+    };
 
-  var results = JSON.parse(response);
-  var chronological_age = results.measurement_dates.chronological_decimal_age;
-  var corrected_age = results.measurement_dates.corrected_decimal_age;
-  var sds = results.measurement_calculated_values.sds;
-  var centile = results.measurement_calculated_values.centile;
+    var url = "https://api.rcpch.ac.uk/growth/v1/uk-who/calculation"
 
-  return chronological_age;
-}
+    var response = UrlFetchApp.fetch(url, request);
 
-/**
- * Returns a decimal age corrected for gestational age if premature (< 37 weeks gestation)
- * @param {date} birth_date. (must be YYY-MM-DD)
- * @param {date} observation_date. (must be YYY-MM-DD)
- * @param {integer} gestation weeks.
- * @param {integer} gestation days.
- * @param {string} sex: must be one of male or female
- * @param {string} measurement_method: must be one of height, weight, ofc or bmi
- * @param {number} observation_value:
- * @return The corrected decimal age
- * @customfunction
- */
+    var results = JSON.parse(response);
 
-function corrected_age(
-  birth_date,
-  observation_date,
-  gestation_weeks,
-  gestation_days,
-  sex,
-  measurement_method,
-  observation_value
-) {
-  var formData = {
-    birth_date: birth_date,
-    observation_date: observation_date,
-    sex: sex,
-    gestation_weeks: gestation_weeks,
-    gestation_days: gestation_days,
-    measurement_method: measurement_method,
-    observation_value: observation_value,
-  };
-  var jsonified = JSON.stringify(formData);
+    var chronological_age = results.measurement_dates.chronological_decimal_age;
+    var corrected_age = results.measurement_dates.corrected_decimal_age;
 
-  var request = {
-    url: url,
-    payload: jsonified,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  };
+    let return_data;
 
-  var url = "https://api.rcpch.ac.uk/uk-who/calculation";
+    switch (data_to_return) {
+      case "both":
+        return_data = [[chronological_age, corrected_age]];
+        break
+      case "chron":
+        return_data = [[chronological_age]];
+        break;
+      case "corr":
+        return_data = [[corrected_age]];
+        break;
+    }
 
-  var response = UrlFetchApp.fetch(url, request);
-
-  var results = JSON.parse(response);
-  var chronological_age = results.measurement_dates.chronological_decimal_age;
-  var corrected_age = results.measurement_dates.corrected_decimal_age;
-  var sds = results.measurement_calculated_values.sds;
-  var centile = results.measurement_calculated_values.centile;
-
-  return corrected_age;
-}
+    return return_data;
+  }
