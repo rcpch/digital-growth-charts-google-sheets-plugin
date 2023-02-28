@@ -174,7 +174,7 @@ function UK_WHO_SDS_CENTILE(
  * @return The requested decimal ages. If "both", returns in the following order: chronological age -> corrected age.
  * @customfunction
  */
-function UK_WHO_DECIMAL_AGE(
+function UK_WHO_CORRECTED_DECIMAL_AGE (
   birth_date,
   observation_date,
   gestation_weeks,
