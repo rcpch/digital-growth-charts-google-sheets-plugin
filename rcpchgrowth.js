@@ -1,5 +1,3 @@
-import "google-apps-script";
-
 // Validation function for input parameters - throws errors, does not return anything.
 function test_helper_(
   birth_date,
@@ -57,7 +55,7 @@ function test_helper_(
  * @param {number} observation_value
  * @param {string} primary_api_key Your primary_api_key
  * @param {string} data_to_return OPTIONAL, default "both", must be one of "both", "centiles", "sds"
- * @return The requested measurements in the following order: chronological SDS -> corrected SDS -> -> chronological centile -> corrected centile.
+ * @return The requested measurements in the following order: chronological SDS -> corrected SDS -> chronological centile -> corrected centile.
  * @customfunction
  */
 function UK_WHO_SDS_CENTILE(
