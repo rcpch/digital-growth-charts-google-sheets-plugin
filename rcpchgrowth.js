@@ -1,5 +1,3 @@
-import "google-apps-script";
-
 // Validation function for input parameters - throws errors, does not return anything.
 function test_helper_(
   birth_date,
